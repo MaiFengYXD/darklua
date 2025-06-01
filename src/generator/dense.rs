@@ -11,6 +11,33 @@ pub struct DenseLuaGenerator {
     last_push_length: usize,
 }
 
+fn to_single_quoted_string(s: &str) -> String {
+    let mut result = String::with_capacity(s.len() + 2);
+    result.push('\'');
+
+    for c in s.chars() {
+        match c {
+            '\'' => result.push_str("\\'"),
+            '\\' => result.push_str("\\\\"),
+            '\0' => result.push_str("\\0"),
+            '\x07' => result.push_str("\\a"),
+            '\x08' => result.push_str("\\b"),
+            '\x0c' => result.push_str("\\f"),
+            '\n' => result.push_str("\\n"),
+            '\r' => result.push_str("\\r"),
+            '\t' => result.push_str("\\t"),
+            '\x0b' => result.push_str("\\v"),
+            _ if c.is_ascii_control() => {
+                result.push_str(&format!("\\x{:02x}", c as u8));
+            }
+            _ => result.push(c),
+        }
+    }
+
+    result.push('\'');
+    result
+}
+
 impl DenseLuaGenerator {
     /// Creates a generator that will wrap the code on a new line after the amount of
     /// characters given by the `column_span` argument.
@@ -882,12 +909,8 @@ impl LuaGenerator for DenseLuaGenerator {
     }
 
     fn write_string(&mut self, string: &nodes::StringExpression) {
-        let result = utils::write_string(string.get_value());
-        if result.starts_with('[') {
-            self.push_str_and_break_if(&result, utils::break_long_string);
-        } else {
-            self.push_str(&result);
-        }
+        let result = to_single_quoted_string(string.get_value());
+        self.push_str(&result);
     }
 
     fn write_interpolated_string(
@@ -974,12 +997,8 @@ impl LuaGenerator for DenseLuaGenerator {
     }
 
     fn write_string_type(&mut self, string_type: &nodes::StringType) {
-        let result = utils::write_string(string_type.get_value());
-        if result.starts_with('[') {
-            self.push_str_and_break_if(&result, utils::break_long_string);
-        } else {
-            self.push_str(&result);
-        }
+        let result = to_single_quoted_string(string_type.get_value());
+        self.push_str(&result);
     }
 
     fn write_array_type(&mut self, array: &nodes::ArrayType) {
